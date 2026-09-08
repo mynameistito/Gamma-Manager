@@ -1,12 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
+using Microsoft.Win32;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace Gamma_Manager
 {
     public partial class Window : Form
     {
+        private const string StartupRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string StartupValueName = "Gamma Manager";
+        private const int DwmwaUseImmersiveDarkMode = 20;
+        private const int DwmwaUseImmersiveDarkModeLegacy = 19;
+        private const int DwmwaBorderColor = 34;
+        private const int DwmwaCaptionColor = 35;
+        private const int DwmwaTextColor = 36;
+
+        [DllImport("dwmapi.dll", ExactSpelling = true)]
+        private static extern int DwmSetWindowAttribute(IntPtr windowHandle, int attribute, ref int value, int valueSize);
+
         System.Globalization.CultureInfo customCulture;
         IniFile iniFile;
 
@@ -23,6 +37,7 @@ namespace Gamma_Manager
         bool redColor = false;
         bool greenColor = false;
         bool blueColor = false;
+        bool allMonitors = false;
 
         private void clearColors()
         {
@@ -94,6 +109,7 @@ namespace Gamma_Manager
             contextMenu.Items.Add(toolStripSeparator2);
             ToolStripMenuItem toolExit = new ToolStripMenuItem("Exit", null, toolExit_Click);
             contextMenu.Items.Add(toolExit);
+            ApplySystemTheme();
         }
 
         private void fillInfo(Display.DisplayInfo currDisplay)
@@ -115,11 +131,13 @@ namespace Gamma_Manager
                 trackBarMonitorContrast.Visible = true;
                 textBoxMonitorContrast.Visible = true;
 
-                textBoxMonitorBrightness.Text = ExternalMonitor.GetBrightness(currDisplay.PhysicalHandle).ToString();
-                trackBarMonitorBrightness.Value = ExternalMonitor.GetBrightness(currDisplay.PhysicalHandle);
+                currDisplay.monitorBrightness = ExternalMonitor.GetBrightness(currDisplay.PhysicalHandle);
+                textBoxMonitorBrightness.Text = currDisplay.monitorBrightness.ToString();
+                trackBarMonitorBrightness.Value = currDisplay.monitorBrightness;
 
-                textBoxMonitorContrast.Text = ExternalMonitor.GetContrast(currDisplay.PhysicalHandle).ToString();
-                trackBarMonitorContrast.Value = ExternalMonitor.GetContrast(currDisplay.PhysicalHandle);
+                currDisplay.monitorContrast = ExternalMonitor.GetContrast(currDisplay.PhysicalHandle);
+                textBoxMonitorContrast.Text = currDisplay.monitorContrast.ToString();
+                trackBarMonitorContrast.Value = currDisplay.monitorContrast;
             }
             else
             {
@@ -128,11 +146,302 @@ namespace Gamma_Manager
                 trackBarMonitorContrast.Visible = false;
                 textBoxMonitorContrast.Visible = false;
 
-                textBoxMonitorBrightness.Text = InternalMonitor.GetBrightness().ToString();
-                trackBarMonitorBrightness.Value = InternalMonitor.GetBrightness();
+                currDisplay.monitorBrightness = InternalMonitor.GetBrightness();
+                textBoxMonitorBrightness.Text = currDisplay.monitorBrightness.ToString();
+                trackBarMonitorBrightness.Value = currDisplay.monitorBrightness;
             }
             disableChangeFunc = false;
         }
+
+        private void fillAllMonitorInfo()
+        {
+            disableChangeFunc = true;
+
+            textBoxGamma.Text = GetSelectedColorValue(currDisplay.rGamma, currDisplay.gGamma, currDisplay.bGamma).ToString("0.00");
+            textBoxContrast.Text = GetSelectedColorValue(currDisplay.rContrast, currDisplay.gContrast, currDisplay.bContrast).ToString("0.00");
+            textBoxBrightness.Text = GetSelectedColorValue(currDisplay.rBright, currDisplay.gBright, currDisplay.bBright).ToString("0.00");
+
+            trackBarGamma.Value = ClampTrackBarValue((int)(GetSelectedColorValue(currDisplay.rGamma, currDisplay.gGamma, currDisplay.bGamma) * 100f), trackBarGamma);
+            trackBarContrast.Value = ClampTrackBarValue((int)(GetSelectedColorValue(currDisplay.rContrast, currDisplay.gContrast, currDisplay.bContrast) * 100f), trackBarContrast);
+            trackBarBrightness.Value = ClampTrackBarValue((int)(GetSelectedColorValue(currDisplay.rBright, currDisplay.gBright, currDisplay.bBright) * 100f), trackBarBrightness);
+
+            bool hasExternalMonitor = false;
+            foreach (Display.DisplayInfo display in displays)
+            {
+                if (display.isExternal)
+                {
+                    hasExternalMonitor = true;
+                    break;
+                }
+            }
+
+            labelMonitorContrastUp.Visible = hasExternalMonitor;
+            labelMonitorContrastDown.Visible = hasExternalMonitor;
+            trackBarMonitorContrast.Visible = hasExternalMonitor;
+            textBoxMonitorContrast.Visible = hasExternalMonitor;
+
+            textBoxMonitorBrightness.Text = currDisplay.monitorBrightness.ToString();
+            trackBarMonitorBrightness.Value = ClampTrackBarValue(currDisplay.monitorBrightness, trackBarMonitorBrightness);
+
+            Display.DisplayInfo contrastDisplay = currDisplay;
+            if (!contrastDisplay.isExternal)
+            {
+                foreach (Display.DisplayInfo display in displays)
+                {
+                    if (display.isExternal)
+                    {
+                        contrastDisplay = display;
+                        break;
+                    }
+                }
+            }
+
+            if (hasExternalMonitor)
+            {
+                textBoxMonitorContrast.Text = contrastDisplay.monitorContrast.ToString();
+                trackBarMonitorContrast.Value = ClampTrackBarValue(contrastDisplay.monitorContrast, trackBarMonitorContrast);
+            }
+
+            disableChangeFunc = false;
+        }
+
+        private static int ClampTrackBarValue(int value, TrackBar trackBar)
+        {
+            return Math.Max(trackBar.Minimum, Math.Min(trackBar.Maximum, value));
+        }
+
+        private float GetSelectedColorValue(float redValue, float greenValue, float blueValue)
+        {
+            if (allColors)
+            {
+                return (redValue + greenValue + blueValue) / 3f;
+            }
+
+            if (greenColor)
+            {
+                return greenValue;
+            }
+
+            if (blueColor)
+            {
+                return blueValue;
+            }
+
+            return redValue;
+        }
+
+        private void SetAllMonitorsMode(bool enabled)
+        {
+            allMonitors = enabled;
+            buttonAllMonitors.Text = allMonitors ? "Single Monitor" : "All Monitors";
+            comboBoxMonitors.Enabled = !allMonitors;
+            buttonForward.Enabled = !allMonitors;
+            comboBoxPresets.Enabled = !allMonitors;
+        }
+
+        private static void ApplyGammaRamp(Display.DisplayInfo display)
+        {
+            Gamma.SetGammaRamp(display.displayLink,
+                Gamma.CreateGammaRamp(display.rGamma, display.gGamma, display.bGamma, display.rContrast,
+                display.gContrast, display.bContrast, display.rBright, display.gBright, display.bBright));
+        }
+
+        private static bool IsSystemDarkModeEnabled()
+        {
+            using (RegistryKey personalizeKey = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", false))
+            {
+                if (personalizeKey == null)
+                {
+                    return false;
+                }
+
+                object lightThemeValue = personalizeKey.GetValue("AppsUseLightTheme");
+                return lightThemeValue != null && Convert.ToInt32(lightThemeValue) == 0;
+            }
+        }
+
+        private static void ApplyControlTheme(Control control, bool darkMode)
+        {
+            Color backgroundColor = darkMode ? Color.FromArgb(30, 35, 42) : SystemColors.Control;
+            Color controlColor = darkMode ? Color.FromArgb(36, 41, 47) : SystemColors.Window;
+            Color foregroundColor = darkMode ? Color.FromArgb(230, 237, 243) : SystemColors.ControlText;
+            Color borderColor = darkMode ? Color.FromArgb(82, 90, 101) : SystemColors.ControlDark;
+
+            control.ForeColor = foregroundColor;
+            if (control is Form || control is TrackBar || control is PictureBox)
+            {
+                control.BackColor = backgroundColor;
+            }
+            else if (control is TextBoxBase || control is ComboBox)
+            {
+                control.BackColor = controlColor;
+                if (control is TextBoxBase textBox)
+                {
+                    textBox.BorderStyle = darkMode ? BorderStyle.FixedSingle : BorderStyle.Fixed3D;
+                }
+                else if (control is ComboBox comboBox)
+                {
+                    comboBox.FlatStyle = darkMode ? FlatStyle.Flat : FlatStyle.Standard;
+                }
+            }
+            else if (control is Button button)
+            {
+                button.BackColor = darkMode ? Color.FromArgb(43, 49, 58) : SystemColors.Control;
+                button.UseVisualStyleBackColor = !darkMode;
+                button.FlatStyle = darkMode ? FlatStyle.Flat : FlatStyle.Standard;
+                button.FlatAppearance.BorderColor = borderColor;
+                button.FlatAppearance.BorderSize = darkMode ? 1 : 0;
+                button.FlatAppearance.MouseOverBackColor = darkMode ? Color.FromArgb(56, 65, 76) : SystemColors.Control;
+                button.FlatAppearance.MouseDownBackColor = darkMode ? Color.FromArgb(65, 74, 86) : SystemColors.Control;
+            }
+            else if (control is CheckBox checkBox)
+            {
+                checkBox.BackColor = backgroundColor;
+            }
+            else if (control is Label label)
+            {
+                label.BackColor = Color.Transparent;
+            }
+
+            foreach (Control childControl in control.Controls)
+            {
+                ApplyControlTheme(childControl, darkMode);
+            }
+        }
+
+        private void ApplySystemTheme()
+        {
+            bool darkMode = IsSystemDarkModeEnabled();
+            ApplyControlTheme(this, darkMode);
+
+            Color menuBackgroundColor = darkMode ? Color.FromArgb(36, 41, 47) : SystemColors.Menu;
+            Color menuForegroundColor = darkMode ? Color.FromArgb(230, 237, 243) : SystemColors.MenuText;
+            contextMenu.BackColor = menuBackgroundColor;
+            contextMenu.ForeColor = menuForegroundColor;
+            foreach (ToolStripItem item in contextMenu.Items)
+            {
+                item.BackColor = menuBackgroundColor;
+                item.ForeColor = menuForegroundColor;
+
+                if (item is ToolStripComboBox toolStripComboBox)
+                {
+                    toolStripComboBox.ComboBox.BackColor = menuBackgroundColor;
+                    toolStripComboBox.ComboBox.ForeColor = menuForegroundColor;
+                }
+            }
+
+            ApplyWindowFrameTheme(darkMode);
+        }
+
+        private void ApplyWindowFrameTheme(bool darkMode)
+        {
+            if (!IsHandleCreated)
+            {
+                return;
+            }
+
+            int darkModeValue = darkMode ? 1 : 0;
+            int result = DwmSetWindowAttribute(Handle, DwmwaUseImmersiveDarkMode, ref darkModeValue, sizeof(int));
+            if (result != 0)
+            {
+                DwmSetWindowAttribute(Handle, DwmwaUseImmersiveDarkModeLegacy, ref darkModeValue, sizeof(int));
+            }
+
+            Color captionColor = darkMode ? Color.FromArgb(30, 35, 42) : Color.FromArgb(246, 248, 250);
+            Color captionTextColor = darkMode ? Color.FromArgb(230, 237, 243) : Color.FromArgb(31, 35, 40);
+            Color borderColor = darkMode ? Color.FromArgb(82, 90, 101) : Color.FromArgb(208, 215, 222);
+            int captionColorValue = ColorTranslator.ToWin32(captionColor);
+            int captionTextColorValue = ColorTranslator.ToWin32(captionTextColor);
+            int borderColorValue = ColorTranslator.ToWin32(borderColor);
+
+            DwmSetWindowAttribute(Handle, DwmwaCaptionColor, ref captionColorValue, sizeof(int));
+            DwmSetWindowAttribute(Handle, DwmwaTextColor, ref captionTextColorValue, sizeof(int));
+            DwmSetWindowAttribute(Handle, DwmwaBorderColor, ref borderColorValue, sizeof(int));
+        }
+
+        private void SystemEvents_UserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            if (IsDisposed || !IsHandleCreated)
+            {
+                return;
+            }
+
+            try
+            {
+                BeginInvoke(new MethodInvoker(ApplySystemTheme));
+            }
+            catch (InvalidOperationException)
+            {
+                // The form can close between the handle check and BeginInvoke.
+            }
+        }
+
+        private void Window_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;
+        }
+
+        private static bool IsStartupEnabled()
+        {
+            using (RegistryKey runKey = Registry.CurrentUser.OpenSubKey(StartupRegistryPath, false))
+            {
+                if (runKey == null)
+                {
+                    return false;
+                }
+
+                object startupValue = runKey.GetValue(StartupValueName);
+                string startupCommand = startupValue as string;
+                if (startupCommand == null)
+                {
+                    return false;
+                }
+
+                string executablePath = Application.ExecutablePath;
+                return string.Equals(startupCommand, executablePath, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(startupCommand, "\"" + executablePath + "\"", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private static void SetStartupEnabled(bool enabled)
+        {
+            RegistryKey runKey = Registry.CurrentUser.CreateSubKey(StartupRegistryPath);
+            if (runKey == null)
+            {
+                throw new InvalidOperationException("Unable to access the Windows startup registry key.");
+            }
+
+            using (runKey)
+            {
+                if (enabled)
+                {
+                    runKey.SetValue(StartupValueName, "\"" + Application.ExecutablePath + "\"");
+                }
+                else
+                {
+                    runKey.DeleteValue(StartupValueName, false);
+                }
+            }
+        }
+
+        private void checkBoxStartWithWindows_CheckedChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                SetStartupEnabled(checkBoxStartWithWindows.Checked);
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(this, "Could not update Windows startup settings.\n\n" + exception.Message,
+                    "Gamma Manager", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+                checkBoxStartWithWindows.CheckedChanged -= checkBoxStartWithWindows_CheckedChanged;
+                checkBoxStartWithWindows.Checked = !checkBoxStartWithWindows.Checked;
+                checkBoxStartWithWindows.CheckedChanged += checkBoxStartWithWindows_CheckedChanged;
+            }
+        }
+
         private void Window_Load(object sender, EventArgs e)
         {
             int screenWidth = Screen.PrimaryScreen.Bounds.Size.Width;
@@ -150,15 +459,27 @@ namespace Gamma_Manager
             TaskBarHeight *= ratio;*/
 
             Location = new Point(screenWidth - windowWidth, screenHeight - (windowHeight + TaskBarHeight));
+            ApplySystemTheme();
         }
 
         public Window()
         {
             InitializeComponent();
+            checkBoxStartWithWindows.Checked = IsStartupEnabled();
             customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
             customCulture.NumberFormat.NumberDecimalSeparator = ",";
 
-            iniFile = new IniFile("GammaManager.ini");
+            string settingsDirectory = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Gamma Manager");
+            System.IO.Directory.CreateDirectory(settingsDirectory);
+            string settingsPath = System.IO.Path.Combine(settingsDirectory, "GammaManager.ini");
+            string legacySettingsPath = System.IO.Path.Combine(Application.StartupPath, "GammaManager.ini");
+            if (!System.IO.File.Exists(settingsPath) && System.IO.File.Exists(legacySettingsPath))
+            {
+                System.IO.File.Copy(legacySettingsPath, settingsPath);
+            }
+
+            iniFile = new IniFile(settingsPath);
 
             buttonAllColors.Font = new Font(buttonAllColors.Font.Name, buttonAllColors.Font.Size, FontStyle.Bold);
 
@@ -179,6 +500,9 @@ namespace Gamma_Manager
 
             initTrayMenu();
             notifyIcon.ContextMenuStrip = contextMenu;
+            ApplySystemTheme();
+            SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
+            FormClosed += Window_FormClosed;
         }
 
         private void trackBarGamma_ValueChanged(object sender, EventArgs e)
@@ -188,6 +512,35 @@ namespace Gamma_Manager
             if (!disableChangeFunc)
             {
                 textBoxGamma.Text = ((float)trackBarGamma.Value / 100f).ToString("0.00");
+
+                if (allMonitors)
+                {
+                    foreach (Display.DisplayInfo display in displays)
+                    {
+                        if (allColors)
+                        {
+                            display.rGamma = (float)trackBarGamma.Value / 100f;
+                            display.gGamma = (float)trackBarGamma.Value / 100f;
+                            display.bGamma = (float)trackBarGamma.Value / 100f;
+                        }
+                        else if (redColor)
+                        {
+                            display.rGamma = (float)trackBarGamma.Value / 100f;
+                        }
+                        else if (greenColor)
+                        {
+                            display.gGamma = (float)trackBarGamma.Value / 100f;
+                        }
+                        else if (blueColor)
+                        {
+                            display.bGamma = (float)trackBarGamma.Value / 100f;
+                        }
+
+                        ApplyGammaRamp(display);
+                    }
+
+                    return;
+                }
 
                 if (allColors)
                 {
@@ -241,6 +594,35 @@ namespace Gamma_Manager
             {
                 textBoxContrast.Text = ((float)trackBarContrast.Value / 100f).ToString("0.00");
 
+                if (allMonitors)
+                {
+                    foreach (Display.DisplayInfo display in displays)
+                    {
+                        if (allColors)
+                        {
+                            display.rContrast = (float)trackBarContrast.Value / 100f;
+                            display.gContrast = (float)trackBarContrast.Value / 100f;
+                            display.bContrast = (float)trackBarContrast.Value / 100f;
+                        }
+                        else if (redColor)
+                        {
+                            display.rContrast = (float)trackBarContrast.Value / 100f;
+                        }
+                        else if (greenColor)
+                        {
+                            display.gContrast = (float)trackBarContrast.Value / 100f;
+                        }
+                        else if (blueColor)
+                        {
+                            display.bContrast = (float)trackBarContrast.Value / 100f;
+                        }
+
+                        ApplyGammaRamp(display);
+                    }
+
+                    return;
+                }
+
                 if (allColors)
                 {
                     currDisplay.rContrast = (float)trackBarContrast.Value / 100f;
@@ -290,6 +672,35 @@ namespace Gamma_Manager
             if (!disableChangeFunc)
             {
                 textBoxBrightness.Text = ((float)trackBarBrightness.Value / 100f).ToString("0.00");
+
+                if (allMonitors)
+                {
+                    foreach (Display.DisplayInfo display in displays)
+                    {
+                        if (allColors)
+                        {
+                            display.rBright = (float)trackBarBrightness.Value / 100f;
+                            display.gBright = (float)trackBarBrightness.Value / 100f;
+                            display.bBright = (float)trackBarBrightness.Value / 100f;
+                        }
+                        else if (redColor)
+                        {
+                            display.rBright = (float)trackBarBrightness.Value / 100f;
+                        }
+                        else if (greenColor)
+                        {
+                            display.gBright = (float)trackBarBrightness.Value / 100f;
+                        }
+                        else if (blueColor)
+                        {
+                            display.bBright = (float)trackBarBrightness.Value / 100f;
+                        }
+
+                        ApplyGammaRamp(display);
+                    }
+
+                    return;
+                }
 
                 if (allColors)
                 {
@@ -341,6 +752,24 @@ namespace Gamma_Manager
             {
                 textBoxMonitorBrightness.Text = trackBarMonitorBrightness.Value.ToString();
 
+                if (allMonitors)
+                {
+                    foreach (Display.DisplayInfo display in displays)
+                    {
+                        display.monitorBrightness = trackBarMonitorBrightness.Value;
+                        if (display.isExternal)
+                        {
+                            ExternalMonitor.SetBrightness(display.PhysicalHandle, (uint)trackBarMonitorBrightness.Value);
+                        }
+                        else
+                        {
+                            InternalMonitor.SetBrightness((byte)trackBarMonitorBrightness.Value);
+                        }
+                    }
+
+                    return;
+                }
+
                 currDisplay.monitorBrightness = trackBarMonitorBrightness.Value;
 
                 if (currDisplay.isExternal)
@@ -362,10 +791,131 @@ namespace Gamma_Manager
             {
                 textBoxMonitorContrast.Text = trackBarMonitorContrast.Value.ToString();
 
+                if (allMonitors)
+                {
+                    foreach (Display.DisplayInfo display in displays)
+                    {
+                        if (display.isExternal)
+                        {
+                            display.monitorContrast = trackBarMonitorContrast.Value;
+                            ExternalMonitor.SetContrast(display.PhysicalHandle, (uint)trackBarMonitorContrast.Value);
+                        }
+                    }
+
+                    return;
+                }
+
                 currDisplay.monitorContrast = trackBarMonitorContrast.Value;
 
                 ExternalMonitor.SetContrast(currDisplay.PhysicalHandle, (uint)trackBarMonitorContrast.Value);
             }
+        }
+
+        private void sliderTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode != Keys.Enter)
+            {
+                return;
+            }
+
+            TextBox textBox = sender as TextBox;
+            if (textBox == null)
+            {
+                return;
+            }
+
+            ApplySliderTextBoxValue(textBox);
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+        }
+
+        private void sliderTextBox_Leave(object sender, EventArgs e)
+        {
+            TextBox textBox = sender as TextBox;
+            if (textBox != null)
+            {
+                ApplySliderTextBoxValue(textBox);
+            }
+        }
+
+        private void ApplySliderTextBoxValue(TextBox textBox)
+        {
+            if (textBox == textBoxGamma)
+            {
+                ApplyDecimalSliderTextBoxValue(textBox, trackBarGamma);
+                return;
+            }
+
+            if (textBox == textBoxContrast)
+            {
+                ApplyDecimalSliderTextBoxValue(textBox, trackBarContrast);
+                return;
+            }
+
+            if (textBox == textBoxBrightness)
+            {
+                ApplyDecimalSliderTextBoxValue(textBox, trackBarBrightness);
+                return;
+            }
+
+            if (textBox == textBoxMonitorBrightness)
+            {
+                ApplyIntegerSliderTextBoxValue(textBox, trackBarMonitorBrightness);
+                return;
+            }
+
+            if (textBox == textBoxMonitorContrast)
+            {
+                ApplyIntegerSliderTextBoxValue(textBox, trackBarMonitorContrast);
+            }
+        }
+
+        private void ApplyDecimalSliderTextBoxValue(TextBox textBox, TrackBar trackBar)
+        {
+            float parsedValue;
+            if (!TryParseFloat(textBox.Text, out parsedValue) || float.IsNaN(parsedValue) || float.IsInfinity(parsedValue))
+            {
+                textBox.Text = (trackBar.Value / 100f).ToString("0.00");
+                return;
+            }
+
+            float scaledValue = parsedValue * 100f;
+            int sliderValue;
+            if (scaledValue <= trackBar.Minimum)
+            {
+                sliderValue = trackBar.Minimum;
+            }
+            else if (scaledValue >= trackBar.Maximum)
+            {
+                sliderValue = trackBar.Maximum;
+            }
+            else
+            {
+                sliderValue = (int)Math.Round(scaledValue, MidpointRounding.AwayFromZero);
+            }
+
+            trackBar.Value = sliderValue;
+            textBox.Text = (trackBar.Value / 100f).ToString("0.00");
+        }
+
+        private void ApplyIntegerSliderTextBoxValue(TextBox textBox, TrackBar trackBar)
+        {
+            int parsedValue;
+            if (!int.TryParse(textBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out parsedValue) &&
+                !int.TryParse(textBox.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedValue))
+            {
+                textBox.Text = trackBar.Value.ToString();
+                return;
+            }
+
+            trackBar.Value = Math.Max(trackBar.Minimum, Math.Min(trackBar.Maximum, parsedValue));
+            textBox.Text = trackBar.Value.ToString();
+        }
+
+        private static bool TryParseFloat(string text, out float value)
+        {
+            return float.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value) ||
+                float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
         }
 
         private void buttonAllColors_Click(object sender, EventArgs e)
@@ -384,6 +934,21 @@ namespace Gamma_Manager
 
             buttonAllColors.Font = new Font(buttonAllColors.Font.Name, buttonAllColors.Font.Size, FontStyle.Bold);
             disableChangeFunc = false;
+        }
+
+        private void buttonAllMonitors_Click(object sender, EventArgs e)
+        {
+            comboBoxPresets.Text = string.Empty;
+            SetAllMonitorsMode(!allMonitors);
+
+            if (allMonitors)
+            {
+                fillAllMonitorInfo();
+            }
+            else
+            {
+                fillInfo(currDisplay);
+            }
         }
 
         private void buttonRed_Click(object sender, EventArgs e)
@@ -485,6 +1050,41 @@ namespace Gamma_Manager
         {
             comboBoxPresets.Text = string.Empty;
 
+            if (allMonitors)
+            {
+                foreach (Display.DisplayInfo display in displays)
+                {
+                    display.rGamma = 1;
+                    display.gGamma = 1;
+                    display.bGamma = 1;
+                    display.rContrast = 1;
+                    display.gContrast = 1;
+                    display.bContrast = 1;
+                    display.rBright = 0;
+                    display.gBright = 0;
+                    display.bBright = 0;
+                    display.monitorBrightness = 100;
+
+                    if (display.isExternal)
+                    {
+                        display.monitorContrast = 50;
+                        ExternalMonitor.SetBrightness(display.PhysicalHandle, 100);
+                        ExternalMonitor.SetContrast(display.PhysicalHandle, 50);
+                    }
+                    else
+                    {
+                        InternalMonitor.SetBrightness(100);
+                    }
+
+                    ApplyGammaRamp(display);
+                }
+
+                fillAllMonitorInfo();
+                initPresets();
+                initTrayMenu();
+                return;
+            }
+
             buttonAllColors.PerformClick();
 
             trackBarGamma.Value = 100;
@@ -527,6 +1127,11 @@ namespace Gamma_Manager
 
         private void comboBoxMonitors_SelectedIndexChanged(object sender, EventArgs e)
         {
+            if (allMonitors)
+            {
+                return;
+            }
+
             string num = comboBoxMonitors.SelectedItem.ToString();
 
             num = num.Substring(0, num.IndexOf(")"));
@@ -540,6 +1145,11 @@ namespace Gamma_Manager
 
         private void buttonForward_Click(object sender, EventArgs e)
         {
+            if (allMonitors)
+            {
+                return;
+            }
+
             if (numDisplay + 1 <= displays.Count-1)
             {
                 comboBoxMonitors.SelectedIndex = numDisplay + 1;
@@ -551,7 +1161,7 @@ namespace Gamma_Manager
 
         private void comboBoxPresets_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (!disableChangeFunc)
+            if (!disableChangeFunc && !allMonitors)
             {
                 string test = comboBoxPresets.Text;
                 currDisplay.rGamma = float.Parse(iniFile.Read("rGamma", comboBoxPresets.Text), customCulture);
@@ -616,6 +1226,11 @@ namespace Gamma_Manager
 
         private void comboBoxToolMonitor_IndexChanged(object sender, EventArgs e)
         {
+            if (allMonitors)
+            {
+                SetAllMonitorsMode(false);
+            }
+
             if (!disableChangeFunc)
             {
                 string monitor = sender.ToString().Substring(0, sender.ToString().IndexOf(":"));

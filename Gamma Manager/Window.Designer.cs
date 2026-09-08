@@ -58,6 +58,8 @@
             this.trackBarMonitorContrast = new System.Windows.Forms.TrackBar();
             this.textBoxMonitorContrast = new System.Windows.Forms.TextBox();
             this.buttonForward = new System.Windows.Forms.Button();
+            this.buttonAllMonitors = new System.Windows.Forms.Button();
+            this.checkBoxStartWithWindows = new System.Windows.Forms.CheckBox();
             this.checkBoxExContrast = new System.Windows.Forms.CheckBox();
             this.notifyIcon = new System.Windows.Forms.NotifyIcon(this.components);
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
@@ -87,9 +89,9 @@
             // buttonRed
             // 
             this.buttonRed.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonRed.Location = new System.Drawing.Point(452, 2);
+            this.buttonRed.Location = new System.Drawing.Point(456, 2);
             this.buttonRed.Name = "buttonRed";
-            this.buttonRed.Size = new System.Drawing.Size(69, 30);
+            this.buttonRed.Size = new System.Drawing.Size(65, 30);
             this.buttonRed.TabIndex = 1;
             this.buttonRed.Text = "Red";
             this.buttonRed.UseVisualStyleBackColor = true;
@@ -97,9 +99,9 @@
             // 
             // buttonGreen
             // 
-            this.buttonGreen.Location = new System.Drawing.Point(452, 32);
+            this.buttonGreen.Location = new System.Drawing.Point(456, 32);
             this.buttonGreen.Name = "buttonGreen";
-            this.buttonGreen.Size = new System.Drawing.Size(69, 30);
+            this.buttonGreen.Size = new System.Drawing.Size(65, 30);
             this.buttonGreen.TabIndex = 2;
             this.buttonGreen.Text = "Green";
             this.buttonGreen.UseVisualStyleBackColor = true;
@@ -107,9 +109,9 @@
             // 
             // buttonBlue
             // 
-            this.buttonBlue.Location = new System.Drawing.Point(452, 62);
+            this.buttonBlue.Location = new System.Drawing.Point(456, 62);
             this.buttonBlue.Name = "buttonBlue";
-            this.buttonBlue.Size = new System.Drawing.Size(69, 30);
+            this.buttonBlue.Size = new System.Drawing.Size(65, 30);
             this.buttonBlue.TabIndex = 3;
             this.buttonBlue.Text = "Blue";
             this.buttonBlue.UseVisualStyleBackColor = true;
@@ -119,7 +121,7 @@
             // 
             this.buttonAllColors.Location = new System.Drawing.Point(384, 2);
             this.buttonAllColors.Name = "buttonAllColors";
-            this.buttonAllColors.Size = new System.Drawing.Size(69, 59);
+            this.buttonAllColors.Size = new System.Drawing.Size(68, 59);
             this.buttonAllColors.TabIndex = 4;
             this.buttonAllColors.Text = "All Colors";
             this.buttonAllColors.UseVisualStyleBackColor = true;
@@ -148,7 +150,7 @@
             // 
             this.buttonSave.Location = new System.Drawing.Point(384, 100);
             this.buttonSave.Name = "buttonSave";
-            this.buttonSave.Size = new System.Drawing.Size(69, 28);
+            this.buttonSave.Size = new System.Drawing.Size(68, 28);
             this.buttonSave.TabIndex = 7;
             this.buttonSave.Text = "Save";
             this.buttonSave.UseVisualStyleBackColor = true;
@@ -194,28 +196,34 @@
             // 
             this.textBoxGamma.Location = new System.Drawing.Point(338, 5);
             this.textBoxGamma.Name = "textBoxGamma";
-            this.textBoxGamma.ReadOnly = true;
+            this.textBoxGamma.ReadOnly = false;
             this.textBoxGamma.Size = new System.Drawing.Size(43, 22);
             this.textBoxGamma.TabIndex = 11;
             this.textBoxGamma.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            this.textBoxGamma.KeyDown += new System.Windows.Forms.KeyEventHandler(this.sliderTextBox_KeyDown);
+            this.textBoxGamma.Leave += new System.EventHandler(this.sliderTextBox_Leave);
             // 
             // textBoxContrast
             // 
             this.textBoxContrast.Location = new System.Drawing.Point(338, 65);
             this.textBoxContrast.Name = "textBoxContrast";
-            this.textBoxContrast.ReadOnly = true;
+            this.textBoxContrast.ReadOnly = false;
             this.textBoxContrast.Size = new System.Drawing.Size(43, 22);
             this.textBoxContrast.TabIndex = 12;
             this.textBoxContrast.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            this.textBoxContrast.KeyDown += new System.Windows.Forms.KeyEventHandler(this.sliderTextBox_KeyDown);
+            this.textBoxContrast.Leave += new System.EventHandler(this.sliderTextBox_Leave);
             // 
             // textBoxBrightness
             // 
             this.textBoxBrightness.Location = new System.Drawing.Point(338, 35);
             this.textBoxBrightness.Name = "textBoxBrightness";
-            this.textBoxBrightness.ReadOnly = true;
+            this.textBoxBrightness.ReadOnly = false;
             this.textBoxBrightness.Size = new System.Drawing.Size(43, 22);
             this.textBoxBrightness.TabIndex = 13;
             this.textBoxBrightness.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            this.textBoxBrightness.KeyDown += new System.Windows.Forms.KeyEventHandler(this.sliderTextBox_KeyDown);
+            this.textBoxBrightness.Leave += new System.EventHandler(this.sliderTextBox_Leave);
             // 
             // labelGamma
             // 
@@ -246,9 +254,9 @@
             // 
             // buttonDelete
             // 
-            this.buttonDelete.Location = new System.Drawing.Point(452, 100);
+            this.buttonDelete.Location = new System.Drawing.Point(456, 100);
             this.buttonDelete.Name = "buttonDelete";
-            this.buttonDelete.Size = new System.Drawing.Size(69, 28);
+            this.buttonDelete.Size = new System.Drawing.Size(65, 28);
             this.buttonDelete.TabIndex = 17;
             this.buttonDelete.Text = "Delete";
             this.buttonDelete.UseVisualStyleBackColor = true;
@@ -257,7 +265,7 @@
             // labelMonitorBrightnessUp
             // 
             this.labelMonitorBrightnessUp.AutoSize = true;
-            this.labelMonitorBrightnessUp.Location = new System.Drawing.Point(3, 133);
+            this.labelMonitorBrightnessUp.Location = new System.Drawing.Point(3, 163);
             this.labelMonitorBrightnessUp.Name = "labelMonitorBrightnessUp";
             this.labelMonitorBrightnessUp.Size = new System.Drawing.Size(51, 16);
             this.labelMonitorBrightnessUp.TabIndex = 20;
@@ -265,17 +273,19 @@
             // 
             // textBoxMonitorBrightness
             // 
-            this.textBoxMonitorBrightness.Location = new System.Drawing.Point(338, 140);
+            this.textBoxMonitorBrightness.Location = new System.Drawing.Point(338, 170);
             this.textBoxMonitorBrightness.Name = "textBoxMonitorBrightness";
-            this.textBoxMonitorBrightness.ReadOnly = true;
+            this.textBoxMonitorBrightness.ReadOnly = false;
             this.textBoxMonitorBrightness.Size = new System.Drawing.Size(43, 22);
             this.textBoxMonitorBrightness.TabIndex = 19;
             this.textBoxMonitorBrightness.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            this.textBoxMonitorBrightness.KeyDown += new System.Windows.Forms.KeyEventHandler(this.sliderTextBox_KeyDown);
+            this.textBoxMonitorBrightness.Leave += new System.EventHandler(this.sliderTextBox_Leave);
             // 
             // trackBarMonitorBrightness
             // 
             this.trackBarMonitorBrightness.LargeChange = 1;
-            this.trackBarMonitorBrightness.Location = new System.Drawing.Point(80, 136);
+            this.trackBarMonitorBrightness.Location = new System.Drawing.Point(80, 166);
             this.trackBarMonitorBrightness.Maximum = 100;
             this.trackBarMonitorBrightness.Name = "trackBarMonitorBrightness";
             this.trackBarMonitorBrightness.Size = new System.Drawing.Size(253, 56);
@@ -287,7 +297,7 @@
             // labelMonitorBrightnessDown
             // 
             this.labelMonitorBrightnessDown.AutoSize = true;
-            this.labelMonitorBrightnessDown.Location = new System.Drawing.Point(3, 148);
+            this.labelMonitorBrightnessDown.Location = new System.Drawing.Point(3, 178);
             this.labelMonitorBrightnessDown.Name = "labelMonitorBrightnessDown";
             this.labelMonitorBrightnessDown.Size = new System.Drawing.Size(70, 16);
             this.labelMonitorBrightnessDown.TabIndex = 21;
@@ -306,7 +316,7 @@
             // labelMonitorContrastUp
             // 
             this.labelMonitorContrastUp.AutoSize = true;
-            this.labelMonitorContrastUp.Location = new System.Drawing.Point(4, 170);
+            this.labelMonitorContrastUp.Location = new System.Drawing.Point(4, 200);
             this.labelMonitorContrastUp.Name = "labelMonitorContrastUp";
             this.labelMonitorContrastUp.Size = new System.Drawing.Size(51, 16);
             this.labelMonitorContrastUp.TabIndex = 24;
@@ -315,7 +325,7 @@
             // labelMonitorContrastDown
             // 
             this.labelMonitorContrastDown.AutoSize = true;
-            this.labelMonitorContrastDown.Location = new System.Drawing.Point(4, 185);
+            this.labelMonitorContrastDown.Location = new System.Drawing.Point(4, 215);
             this.labelMonitorContrastDown.Name = "labelMonitorContrastDown";
             this.labelMonitorContrastDown.Size = new System.Drawing.Size(56, 16);
             this.labelMonitorContrastDown.TabIndex = 25;
@@ -324,7 +334,7 @@
             // trackBarMonitorContrast
             // 
             this.trackBarMonitorContrast.LargeChange = 1;
-            this.trackBarMonitorContrast.Location = new System.Drawing.Point(81, 171);
+            this.trackBarMonitorContrast.Location = new System.Drawing.Point(81, 201);
             this.trackBarMonitorContrast.Maximum = 100;
             this.trackBarMonitorContrast.Name = "trackBarMonitorContrast";
             this.trackBarMonitorContrast.Size = new System.Drawing.Size(253, 56);
@@ -335,12 +345,14 @@
             // 
             // textBoxMonitorContrast
             // 
-            this.textBoxMonitorContrast.Location = new System.Drawing.Point(338, 174);
+            this.textBoxMonitorContrast.Location = new System.Drawing.Point(338, 204);
             this.textBoxMonitorContrast.Name = "textBoxMonitorContrast";
-            this.textBoxMonitorContrast.ReadOnly = true;
+            this.textBoxMonitorContrast.ReadOnly = false;
             this.textBoxMonitorContrast.Size = new System.Drawing.Size(43, 22);
             this.textBoxMonitorContrast.TabIndex = 27;
             this.textBoxMonitorContrast.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            this.textBoxMonitorContrast.KeyDown += new System.Windows.Forms.KeyEventHandler(this.sliderTextBox_KeyDown);
+            this.textBoxMonitorContrast.Leave += new System.EventHandler(this.sliderTextBox_Leave);
             // 
             // buttonForward
             // 
@@ -351,7 +363,29 @@
             this.buttonForward.Text = "Forward";
             this.buttonForward.UseVisualStyleBackColor = true;
             this.buttonForward.Click += new System.EventHandler(this.buttonForward_Click);
-            // 
+            //
+            // buttonAllMonitors
+            //
+            this.buttonAllMonitors.Location = new System.Drawing.Point(6, 132);
+            this.buttonAllMonitors.Name = "buttonAllMonitors";
+            this.buttonAllMonitors.Size = new System.Drawing.Size(219, 28);
+            this.buttonAllMonitors.TabIndex = 31;
+            this.buttonAllMonitors.Text = "All Monitors";
+            this.buttonAllMonitors.UseVisualStyleBackColor = true;
+            this.buttonAllMonitors.Click += new System.EventHandler(this.buttonAllMonitors_Click);
+            //
+            // checkBoxStartWithWindows
+            //
+            this.checkBoxStartWithWindows.AutoSize = false;
+            this.checkBoxStartWithWindows.Location = new System.Drawing.Point(231, 136);
+            this.checkBoxStartWithWindows.Name = "checkBoxStartWithWindows";
+            this.checkBoxStartWithWindows.Size = new System.Drawing.Size(130, 20);
+            this.checkBoxStartWithWindows.TabIndex = 32;
+            this.checkBoxStartWithWindows.Text = "Start with Windows";
+            this.checkBoxStartWithWindows.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.checkBoxStartWithWindows.UseVisualStyleBackColor = true;
+            this.checkBoxStartWithWindows.CheckedChanged += new System.EventHandler(this.checkBoxStartWithWindows_CheckedChanged);
+            //
             // checkBoxExContrast
             // 
             this.checkBoxExContrast.AutoSize = true;
@@ -394,10 +428,12 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.SystemColors.Control;
-            this.ClientSize = new System.Drawing.Size(782, 203);
+            this.ClientSize = new System.Drawing.Size(782, 267);
             this.Controls.Add(this.buttonBlue);
             this.Controls.Add(this.checkBoxExContrast);
             this.Controls.Add(this.buttonForward);
+            this.Controls.Add(this.buttonAllMonitors);
+            this.Controls.Add(this.checkBoxStartWithWindows);
             this.Controls.Add(this.pictureBox1);
             this.Controls.Add(this.textBoxMonitorContrast);
             this.Controls.Add(this.trackBarMonitorContrast);
@@ -475,9 +511,10 @@
         private System.Windows.Forms.TextBox textBoxMonitorContrast;
         private System.Windows.Forms.PictureBox pictureBox1;
         private System.Windows.Forms.Button buttonForward;
+        private System.Windows.Forms.Button buttonAllMonitors;
+        private System.Windows.Forms.CheckBox checkBoxStartWithWindows;
         private System.Windows.Forms.CheckBox checkBoxExContrast;
         private System.Windows.Forms.NotifyIcon notifyIcon;
         private System.Windows.Forms.ContextMenuStrip contextMenu;
     }
 }
-
