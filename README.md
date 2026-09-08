@@ -1,6 +1,6 @@
 # Gamma Manager
 
-Doesn't need setup, works from .exe file. The only additional .ini file is created in the same folder as .exe file (to save settings presets).
+Gamma Manager installs under Program Files. User settings and presets are stored in `%AppData%\Gamma Manager`.
 
 Overrides all current gamma settings.
 
@@ -35,3 +35,8 @@ Restore minimized window: double click or right click on tray icon - > Settings.
 All monitors should be shown in tray as drop-down lists filled with presets.
 
 Exit: red "x" in upper right or right click on tray icon - > Exit.
+
+## Build an installer
+
+Install Inno Setup, then run `powershell -ExecutionPolicy Bypass -File installer\build.ps1`.
+The end-user installer is created as `artifacts\GammaManagerSetup.exe`. Run that setup executable to install Gamma Manager under Program Files, create Start Menu shortcuts, and register the uninstaller; do not run the executable in `installer\build` directly. The installer requires administrator approval.
