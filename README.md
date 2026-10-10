@@ -40,3 +40,7 @@ Exit: red "x" in upper right or right click on tray icon - > Exit.
 
 Install Inno Setup, then run `powershell -ExecutionPolicy Bypass -File installer\build.ps1`.
 The end-user installer is created as `artifacts\GammaManagerSetup.exe`. Run that setup executable to install Gamma Manager under Program Files, create Start Menu shortcuts, and register the uninstaller; do not run the executable in `installer\build` directly. The installer requires administrator approval.
+
+## Run a development build
+
+Run `powershell -ExecutionPolicy Bypass -File dev.ps1` from the repository root to build Debug and launch the local executable without installing it. Close Gamma Manager and run the command again after making changes.

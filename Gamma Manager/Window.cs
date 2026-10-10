@@ -12,6 +12,7 @@ namespace Gamma_Manager
     {
         private const string StartupRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
         private const string StartupValueName = "Gamma Manager";
+        internal const string MinimizedStartupArgument = "--minimized";
         private const int DwmwaUseImmersiveDarkMode = 20;
         private const int DwmwaUseImmersiveDarkModeLegacy = 19;
         private const int DwmwaBorderColor = 34;
@@ -32,6 +33,7 @@ namespace Gamma_Manager
         ToolStripComboBox toolMonitor;
 
         bool disableChangeFunc = false;
+        bool startMinimized = false;
 
         bool allColors = true;
         bool redColor = false;
@@ -61,12 +63,30 @@ namespace Gamma_Manager
             {
                 for (int i = 0; i < presets.Length; i++)
                 {
-                    if (iniFile.Read("monitor", presets[i]).Equals(currDisplay.displayName))
+                    string presetName = GetPresetName(presets[i]);
+                    if (iniFile.Read("monitor", presets[i]).Equals(currDisplay.displayName) && presetName.Length > 0)
                     {
                         comboBoxPresets.Items.Add(presets[i]);
                     }
                 }
             }
+        }
+
+        private string GetPresetName(string presetText)
+        {
+            string displayPrefix = currDisplay.displayName + ":";
+            if (presetText.StartsWith(displayPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return presetText.Substring(displayPrefix.Length).Trim();
+            }
+
+            return presetText.Trim();
+        }
+
+        private string GetPresetSectionName()
+        {
+            string presetName = GetPresetName(comboBoxPresets.Text);
+            return currDisplay.displayName + ": " + presetName;
         }
 
         private void initTrayMenu()
@@ -269,7 +289,7 @@ namespace Gamma_Manager
             Color borderColor = darkMode ? Color.FromArgb(82, 90, 101) : SystemColors.ControlDark;
 
             control.ForeColor = foregroundColor;
-            if (control is Form || control is TrackBar || control is PictureBox)
+            if (control is Form || control is GroupBox || control is Panel || control is TrackBar || control is PictureBox)
             {
                 control.BackColor = backgroundColor;
             }
@@ -314,6 +334,7 @@ namespace Gamma_Manager
         {
             bool darkMode = IsSystemDarkModeEnabled();
             ApplyControlTheme(this, darkMode);
+            ApplyColorButtonStyles(darkMode);
 
             Color menuBackgroundColor = darkMode ? Color.FromArgb(36, 41, 47) : SystemColors.Menu;
             Color menuForegroundColor = darkMode ? Color.FromArgb(230, 237, 243) : SystemColors.MenuText;
@@ -332,6 +353,36 @@ namespace Gamma_Manager
             }
 
             ApplyWindowFrameTheme(darkMode);
+        }
+
+        private void ApplyColorButtonStyles(bool darkMode)
+        {
+            Color neutralColor = darkMode ? Color.FromArgb(43, 49, 58) : Color.FromArgb(246, 248, 250);
+            Color selectedColor = darkMode ? Color.FromArgb(57, 106, 164) : Color.FromArgb(214, 228, 255);
+
+            ApplyColorButtonStyle(buttonAllColors, neutralColor, selectedColor, allColors, darkMode);
+            ApplyColorButtonStyle(buttonRed,
+                darkMode ? Color.FromArgb(83, 47, 55) : Color.FromArgb(253, 235, 237),
+                darkMode ? Color.FromArgb(153, 67, 82) : Color.FromArgb(248, 180, 186), redColor, darkMode);
+            ApplyColorButtonStyle(buttonGreen,
+                darkMode ? Color.FromArgb(43, 78, 58) : Color.FromArgb(234, 247, 236),
+                darkMode ? Color.FromArgb(48, 125, 76) : Color.FromArgb(174, 224, 181), greenColor, darkMode);
+            ApplyColorButtonStyle(buttonBlue,
+                darkMode ? Color.FromArgb(42, 63, 92) : Color.FromArgb(234, 242, 255),
+                darkMode ? Color.FromArgb(53, 103, 164) : Color.FromArgb(169, 201, 250), blueColor, darkMode);
+        }
+
+        private static void ApplyColorButtonStyle(Button button, Color normalColor, Color selectedColor,
+            bool selected, bool darkMode)
+        {
+            button.BackColor = selected ? selectedColor : normalColor;
+            button.ForeColor = darkMode ? Color.FromArgb(240, 246, 252) : Color.FromArgb(31, 35, 40);
+            button.UseVisualStyleBackColor = false;
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 1;
+            button.FlatAppearance.BorderColor = darkMode ? Color.FromArgb(104, 114, 128) : Color.FromArgb(208, 215, 222);
+            button.FlatAppearance.MouseOverBackColor = selected ? selectedColor : normalColor;
+            button.FlatAppearance.MouseDownBackColor = selected ? selectedColor : normalColor;
         }
 
         private void ApplyWindowFrameTheme(bool darkMode)
@@ -399,8 +450,10 @@ namespace Gamma_Manager
                 }
 
                 string executablePath = Application.ExecutablePath;
+                string quotedExecutablePath = "\"" + executablePath + "\"";
                 return string.Equals(startupCommand, executablePath, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(startupCommand, "\"" + executablePath + "\"", StringComparison.OrdinalIgnoreCase);
+                    string.Equals(startupCommand, quotedExecutablePath, StringComparison.OrdinalIgnoreCase) ||
+                    startupCommand.StartsWith(quotedExecutablePath + " ", StringComparison.OrdinalIgnoreCase);
             }
         }
 
@@ -416,7 +469,8 @@ namespace Gamma_Manager
             {
                 if (enabled)
                 {
-                    runKey.SetValue(StartupValueName, "\"" + Application.ExecutablePath + "\"");
+                    runKey.SetValue(StartupValueName,
+                        "\"" + Application.ExecutablePath + "\" " + MinimizedStartupArgument);
                 }
                 else
                 {
@@ -444,27 +498,29 @@ namespace Gamma_Manager
 
         private void Window_Load(object sender, EventArgs e)
         {
-            int screenWidth = Screen.PrimaryScreen.Bounds.Size.Width;
-            int windowWidth = Width;
-            int screenHeight = Screen.PrimaryScreen.Bounds.Size.Height;
-            int windowHeight = Height;
-            int tmp = Screen.PrimaryScreen.Bounds.Height;
-            int TaskBarHeight = tmp - Screen.PrimaryScreen.WorkingArea.Height;
-
-            //dpi
-            /*int PSH = SystemParameters.PrimaryScreenHeight;
-            int PSBH = Screen.PrimaryScreen.Bounds.Height;
-            double ratio = PSH / PSBH;
-            int TaskBarHeight = PSBH - Screen.PrimaryScreen.WorkingArea.Height;
-            TaskBarHeight *= ratio;*/
-
-            Location = new Point(screenWidth - windowWidth, screenHeight - (windowHeight + TaskBarHeight));
+            Rectangle workingArea = Screen.PrimaryScreen.WorkingArea;
+            Location = new Point(workingArea.Right - Width, workingArea.Bottom - Height);
             ApplySystemTheme();
+
+            if (startMinimized)
+            {
+                BeginInvoke(new MethodInvoker(() =>
+                {
+                    WindowState = FormWindowState.Minimized;
+                    Hide();
+                }));
+            }
         }
 
         public Window()
+            : this(false)
+        {
+        }
+
+        public Window(bool startMinimized)
         {
             InitializeComponent();
+            this.startMinimized = startMinimized;
             checkBoxStartWithWindows.Checked = IsStartupEnabled();
             customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
             customCulture.NumberFormat.NumberDecimalSeparator = ",";
@@ -933,6 +989,7 @@ namespace Gamma_Manager
             trackBarBrightness.Value = (int)(((currDisplay.rBright + currDisplay.gBright + currDisplay.bBright) / 3f) * 100f);
 
             buttonAllColors.Font = new Font(buttonAllColors.Font.Name, buttonAllColors.Font.Size, FontStyle.Bold);
+            ApplyColorButtonStyles(IsSystemDarkModeEnabled());
             disableChangeFunc = false;
         }
 
@@ -966,6 +1023,7 @@ namespace Gamma_Manager
             trackBarBrightness.Value = (int)(currDisplay.rBright * 100f);
 
             buttonRed.Font = new Font(buttonRed.Font.Name, buttonRed.Font.Size, FontStyle.Bold);
+            ApplyColorButtonStyles(IsSystemDarkModeEnabled());
             disableChangeFunc = false;
         }
 
@@ -984,6 +1042,7 @@ namespace Gamma_Manager
             trackBarBrightness.Value = (int)(currDisplay.gBright * 100f);
 
             buttonGreen.Font = new Font(buttonGreen.Font.Name, buttonGreen.Font.Size, FontStyle.Bold);
+            ApplyColorButtonStyles(IsSystemDarkModeEnabled());
             disableChangeFunc = false;
         }
 
@@ -1002,6 +1061,7 @@ namespace Gamma_Manager
             trackBarBrightness.Value = (int)(currDisplay.bBright * 100f);
 
             buttonBlue.Font = new Font(buttonBlue.Font.Name, buttonBlue.Font.Size, FontStyle.Bold);
+            ApplyColorButtonStyles(IsSystemDarkModeEnabled());
             disableChangeFunc = false;
         }
 
@@ -1018,28 +1078,41 @@ namespace Gamma_Manager
 
         private void buttonSave_Click(object sender, EventArgs e)
         {
-            string tmp = comboBoxPresets.Text;
-            iniFile.Write("monitor", currDisplay.displayName, currDisplay.displayName+": "+ comboBoxPresets.Text);
-            iniFile.Write("rGamma", currDisplay.rGamma.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
-            iniFile.Write("gGamma", currDisplay.gGamma.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
-            iniFile.Write("bGamma", currDisplay.bGamma.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
-            iniFile.Write("rContrast", currDisplay.rContrast.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
-            iniFile.Write("gContrast", currDisplay.gContrast.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
-            iniFile.Write("bContrast", currDisplay.bContrast.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
-            iniFile.Write("rBright", currDisplay.rBright.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
-            iniFile.Write("gBright", currDisplay.gBright.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
-            iniFile.Write("bBright", currDisplay.bBright.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
-            iniFile.Write("monitorBrightness", currDisplay.monitorBrightness.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
-            iniFile.Write("monitorContrast", currDisplay.monitorContrast.ToString(customCulture), currDisplay.displayName + ": " + comboBoxPresets.Text);
+            string presetSectionName = GetPresetSectionName();
+            if (GetPresetName(comboBoxPresets.Text).Length == 0)
+            {
+                MessageBox.Show(this, "Enter a preset name before saving.", "Gamma Manager",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                comboBoxPresets.Focus();
+                return;
+            }
+
+            iniFile.Write("monitor", currDisplay.displayName, presetSectionName);
+            iniFile.Write("rGamma", currDisplay.rGamma.ToString(customCulture), presetSectionName);
+            iniFile.Write("gGamma", currDisplay.gGamma.ToString(customCulture), presetSectionName);
+            iniFile.Write("bGamma", currDisplay.bGamma.ToString(customCulture), presetSectionName);
+            iniFile.Write("rContrast", currDisplay.rContrast.ToString(customCulture), presetSectionName);
+            iniFile.Write("gContrast", currDisplay.gContrast.ToString(customCulture), presetSectionName);
+            iniFile.Write("bContrast", currDisplay.bContrast.ToString(customCulture), presetSectionName);
+            iniFile.Write("rBright", currDisplay.rBright.ToString(customCulture), presetSectionName);
+            iniFile.Write("gBright", currDisplay.gBright.ToString(customCulture), presetSectionName);
+            iniFile.Write("bBright", currDisplay.bBright.ToString(customCulture), presetSectionName);
+            iniFile.Write("monitorBrightness", currDisplay.monitorBrightness.ToString(customCulture), presetSectionName);
+            iniFile.Write("monitorContrast", currDisplay.monitorContrast.ToString(customCulture), presetSectionName);
 
             initPresets();
-            comboBoxPresets.Text = currDisplay.displayName + ": " + tmp;
+            comboBoxPresets.Text = presetSectionName;
 
             initTrayMenu();
         }
 
         private void buttonDelete_Click(object sender, EventArgs e)
         {
+            if (GetPresetName(comboBoxPresets.Text).Length == 0)
+            {
+                return;
+            }
+
             iniFile.DeleteSection(comboBoxPresets.Text);
 
             initPresets();
